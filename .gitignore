@@ -102,3 +102,10 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+test/corpus/val_corpus.txt
+test/corpus/unigram.txt
+test/corpus/trigram.txt
+test/corpus/train_corpus.txt
+test/corpus/test_corpus.txt
+test/corpus/europarl.en
+test/corpus/bigram.txt
