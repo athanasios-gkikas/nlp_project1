@@ -14,7 +14,6 @@ class model:
         self.mUnigramCounts = None
         self.mBigramCounts = None
         self.mTrigramCounts = None
-
         return
 
     def build(self, pFile):
@@ -232,7 +231,7 @@ class model:
 
         if pN == 1:
             if (ngram[0] == "*start1*") or (ngram[0] == "*start2*"):
-                ngram[0] = "*start*"
+                ngram[0] = "*start*" ## TODO if we change correctly the vocabularies
 
         if pN == 2:
             if (ngram[0] == "*start1*") or (ngram[0] == "*start2*"):
@@ -250,7 +249,11 @@ class model:
             count = 0
         return count
 
-    def get_language_cross_entropy(self, pCorpus, pN):
+    def get_laplace_smoothing(self, count_nom, count_denom):
+        V = len(self.mUnigramCounts) - 1
+        return (count_nom + 1.0) / (count_denom + V)
+
+    def get_language_cross_entropy(self, pCorpus, pN, D):
         sum_of_entropy = 0
         st = list()
 
@@ -275,7 +278,8 @@ class model:
                 cDenom = 0.0
                 V = len(ngramList[0]) - 1
 
-                temp_token_probability = (self.get_count(ngram) + 1.0) / (self.get_count(ngram[:-1]) + V)
+                temp_token_probability = self.get_laplace_smoothing(self.get_count(ngram), (self.get_count(ngram[:-1])))
+                # temp_token_probability = self.get_kn_smoothing(ngram, D)
                 # print("BI: count:", self.get_count(ngram), " cDenom: ", self.get_count(ngram[:-1]), " V: ", V)
                 # print(temp_token_probability)
                 sum_of_entropy += - math.log2(temp_token_probability)
@@ -283,11 +287,59 @@ class model:
         # print("SUM of CE: ", sum_of_entropy, " N: ", len(ngrams), " Start ngrams: ", start_ngrams)
         return sum_of_entropy / (len(ngrams) - start_ngrams)
 
-    def get_perplexity(self, pCorpus, pN):
-        language_cross_entropy = self.get_language_cross_entropy(pCorpus, pN)
+    def get_prev(self, wk):
+        prev_wk = 0
+        for w in self.mUnigramCounts.keys():
+            temp_ngram = [w[0], ]
+            temp_ngram.append(wk)
+            # temp_ngram.extend(wk)
+            if self.get_count(temp_ngram) > 0:
+                prev_wk += 1
+        return prev_wk
+
+    def get_kn_smoothing(self, ngram, D):
+        pN = len(ngram)
+        print("In kn smoothing")
+        if pN == 2:
+            if self.get_count(ngram) > D:
+                probability_ngram = (self.get_count(ngram) - D) / self.get_count(ngram[:-1])
+                print("Prob of ngram", ngram, " is: ", probability_ngram)
+            else:
+                count = 0
+                for w in self.mUnigramCounts.keys():
+                    temp_ngram = ngram[:-1]
+                    temp_ngram.append(w[0])
+                    if self.get_count(temp_ngram) > 0:
+                        count += 1
+
+                print("Count is", count)
+                a = D * count / max(self.get_count(ngram[:-1]), 1)
+
+                prev_wk = self.get_prev(ngram[-1])
+
+                print("prev_wk is ", prev_wk)
+                sum_prev_v = 0
+                counter = 0
+                for v in self.mUnigramCounts.keys():
+                    counter += 1
+                    print("Counter ", counter)
+                    temp_ngram = ngram[:-1]
+                    temp_ngram.append(v[0])
+                    if self.get_count(temp_ngram) == 0:
+                        sum_prev_v += self.get_prev(v)
+
+                print("Sum is ", sum_prev_v)
+                Prev_wk = prev_wk / max(sum_prev_v, 1) ##fixme
+                probability_ngram = a * Prev_wk
+                print("Prob_b is ", probability_ngram)
+
+        return max(probability_ngram, 1) ##fixme
+
+    def get_perplexity(self, pCorpus, pN, D):
+        language_cross_entropy = self.get_language_cross_entropy(pCorpus, pN, D)
         return pow(2, language_cross_entropy)
 
-    def get_interpolated_language_cross_entropy(self, pCorpus, l=0.5):
+    def get_interpolated_language_cross_entropy(self, pCorpus, D, l=0.5):
         sum_of_entropy = 0
         st = list()
 
@@ -308,21 +360,23 @@ class model:
         start_ngrams = 0
         for ngram in trigrams:
             ngram = tuple(ngram)
-            if (ngram[-1] == "*start1*") or (ngram[-1] == "*start2*"):                                                  # Ion asks for it only in perplexity
+            if (ngram[-1] == "*start1*") or (ngram[-1] == "*start2*"):
                 start_ngrams += 1
             else:
                 V = len(ngramList[0]) - 1
 
                 ######################################################################
 
-                trigram_probability = (self.get_count(ngram) + 1.0) / (self.get_count(ngram[:-1]) + V)
+                trigram_probability = self.get_laplace_smoothing(self.get_count(ngram), self.get_count(ngram[:-1]))
+                # trigram_probability = self.get_kn_smoothing(ngram, D)
 
                 if (trigram_probability < 0.) or (trigram_probability > 1.):
                     print("YOU SUCK TRI!")
                 # print("TRI: count:", self.get_count(ngram), " cDenom: ", self.get_count(ngram[:-1]), " V: ", V)
                 ########################################################################
 
-                bigram_probability = (self.get_count(ngram[1:3]) + 1.0) / (self.get_count([ngram[1],]) + V)
+                bigram_probability = self.get_laplace_smoothing(self.get_count(ngram[1:3]), self.get_count([ngram[1],]))
+                # bigram_probability = self.get_kn_smoothing(ngram[1:3], D)
 
                 if (bigram_probability < 0.) or (bigram_probability > 1.):
                     print("YOU SUCK BI!")
@@ -338,7 +392,7 @@ class model:
         # print("SUM of CE: ", sum_of_entropy, " N: ", len(trigrams), " Start ngrams: ", start_ngrams)
         return sum_of_entropy / (len(trigrams) - start_ngrams)
 
-    def get_interpolated_perplexity(self, pCorpus, l=0.5):
+    def get_interpolated_perplexity(self, pCorpus, D, l=0.5):
         sum_of_entropy = 0
         st = list()
 
@@ -359,21 +413,23 @@ class model:
         start_ngrams = 0
         for ngram in trigrams:
             ngram = tuple(ngram)
-            if (ngram[-1] == "*start1*") or (ngram[-1] == "*start2*"):                                                  # Ion asks for it only in perplexity
+            if (ngram[-1] == "*start1*") or (ngram[-1] == "*start2*"):
                 start_ngrams += 1
             else:
                 V = len(ngramList[0]) - 1
 
                 ######################################################################
 
-                trigram_probability = (self.get_count(ngram) + 1.0) / (self.get_count(ngram[:-1]) + V)
+                # trigram_probability = self.get_laplace_smoothing(self.get_count(ngram), self.get_count(ngram[:-1]))
+                trigram_probability = self.get_kn_smoothing(ngram, D)
 
                 if (trigram_probability < 0.) or (trigram_probability > 1.):
                     print("YOU SUCK TRI!")
                 # print("TRI: count:", self.get_count(ngram), " cDenom: ", self.get_count(ngram[:-1]), " V: ", V)
                 ########################################################################
 
-                bigram_probability = (self.get_count(ngram[1:3]) + 1.0) / (self.get_count([ngram[1],]) + V)
+                # bigram_probability = self.get_laplace_smoothing(self.get_count(ngram[1:3]), self.get_count([ngram[1],]))
+                bigram_probability = self.get_kn_smoothing(ngram[1:3], D)
 
                 if (bigram_probability < 0.) or (bigram_probability > 1.):
                     print("YOU SUCK BI!")

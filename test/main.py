@@ -54,18 +54,18 @@ if __name__ == "__main__" :
     corpus = root + "europarl.en"
 
     m = model.model(root)
-    # m.build(corpus)
+    m.build(corpus)
     m.load_counts()
     queries = m.import_queries()
     # print(queries[:2])
     print(len(m.import_queries()))
-    print("Bigram CE: ", m.get_language_cross_entropy(queries[:100], 2))
-    print("Bigram PER: ", m.get_perplexity(queries[:100], 2))
-    print("Trigram CE: ", m.get_language_cross_entropy(queries[:100], 3))
-    print("Trigram PER: ", m.get_perplexity(queries[:100], 3))
-    for l in range(0, 105, 5):
-        print("l:", l/100., " LANG CE: ", m.get_interpolated_language_cross_entropy(queries[:100], l/100.))
-        print("l:", l / 100., " LANG CE: ", m.get_interpolated_perplexity(queries[:100], l / 100.))
+    print("Bigram CE: ", m.get_language_cross_entropy(queries[:100], 2, 35))
+    # print("Bigram PER: ", m.get_perplexity(queries[:100], 2))
+    # print("Trigram CE: ", m.get_language_cross_entropy(queries[:100], 3))
+    # print("Trigram PER: ", m.get_perplexity(queries[:100], 3))
+    # for l in range(0, 105, 5):
+    #     print("l:", l/100., " LANG CE: ", m.get_interpolated_language_cross_entropy(queries[:100], l/100.))
+    #     print("l:", l / 100., " LANG CE: ", m.get_interpolated_perplexity(queries[:100], l / 100.))
     # probs1 = m.log_probs(queries, 2)
     # for q in queries : random.shuffle(q)
     # probs2 = m.log_probs(queries, 2)
