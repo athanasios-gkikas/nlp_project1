@@ -22,8 +22,6 @@ def process_tweets(tweets):
 	tweet_stopwords = set(stopwords.words('english') + list(punctuation) + ['AT_USER','URL'])
 	new_tweets = {}
 
-	print(my_punctuation)
-
 	for tweet in tweets:
 		text = tweets[tweet][1].lower() # convert text to lower-case
 		text = re.sub('((www\.[^\s]+)|(https?://[^\s]+))', 'URL', text) # remove URLs
