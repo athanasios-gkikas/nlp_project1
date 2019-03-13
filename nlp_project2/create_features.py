@@ -23,6 +23,7 @@ def process_tweets(tweets):
 
 	for tweet in tweets:
 		text = tweets[tweet][1].lower() # convert text to lower-case
+		text = find_emoticons_in_tweets(text) # convert emoticons to text
 		text = re.sub('((www\.[^\s]+)|(https?://[^\s]+))', 'URL', text) # remove URLs
 		text = re.sub('@[^\s]+', 'AT_USER', text) # remove usernames
 		text = re.sub(r'#([^\s]+)', r'\1', text) # remove the # in #hashtag
@@ -35,6 +36,14 @@ def process_tweets(tweets):
 
 	return new_tweets
 
+def find_emoticons_in_tweets(tweet):
+	new_tweet = tweet
+	# All caps? Does it matter?
+	repl = {' :)': ' HAPPY_EMOTICON', ' =)': ' HAPPY_EMOTICON', ' :d': ' VERY_HAPPY_EMOTICON', ' :(': ' SAD_EMOTICON', ' :/': ' MIXED_EMOTICON', ' :p': ' TONGUE_EMOTICON', ' ;)': ' WINK_EMOTICON'}
+	for a, b in repl.items():
+		new_tweet = new_tweet.replace(a, b)
+
+	return new_tweet
 
 def main():
 
@@ -52,7 +61,7 @@ def main():
 	# print(pr_train_tweets[list(pr_train_tweets.keys())[0]])
 
 	test_tweet={}
-	test_tweet["1"] = ["negative", "vaso @petros I am vaso :D friend's #love cats ... / ? helloooooooo"]
+	test_tweet["1"] = ["negative", "vaso @petros I am vaso :D friend's #love cats ... :P :/ ? helloooooooo"]
 
 	new_tweet = process_tweets(test_tweet)
 	print(list(test_tweet.keys())[0])
