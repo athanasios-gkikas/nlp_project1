@@ -3,6 +3,7 @@ import os
 from shutil import rmtree
 import numpy
 import random
+from collections import Counter
 
 def split_data(tweets, keys):
 	new_tweets = {}
@@ -53,9 +54,10 @@ def main():
 	dev_tweets = load_tsv(dev_path)
 	test_tweets = load_tsv(test_path)
 
-	print("Found", len(train_tweets),"in train set")
-	print("Found", len(dev_tweets),"in dev set")
-	print("Found", len(test_tweets),"in test set")
+	print("After removing duplicates and tweets that are the same but have different labels:")
+	print(len(train_tweets),"remained in train set")
+	print(len(dev_tweets),"remained in dev set")
+	print(len(test_tweets),"remained in devtest set")
 
 	#remove tweets that the test was not available
 	cleaned_train_tweets = clean_tweets(train_tweets)
@@ -66,21 +68,56 @@ def main():
 	print("Removed", len(dev_tweets)-len(cleaned_dev_tweets), "\"Not Available\" tweets from dev set")
 	print("Removed", len(test_tweets)-len(cleaned_test_tweets), "\"Not Available\" tweets from test set")
 
-	# print(list(cleaned_train_tweets.keys())[0])
-	# print(cleaned_train_tweets[list(cleaned_train_tweets.keys())[0]][1])
 
-	#split train data to train and val
+	print("Merging existing sets...")
+
+	print("There are", len(cleaned_train_tweets) + len(cleaned_dev_tweets) + len(cleaned_test_tweets), "in total")
+
+	#merge and remove duplicates with different label
+	#improve later
+	total_tweets = cleaned_train_tweets
+	ids = list(cleaned_train_tweets.keys())
+
+	for dev_tweet in cleaned_dev_tweets:
+		if dev_tweet in ids and cleaned_dev_tweets[dev_tweet][0] != total_tweets[dev_tweet][0]:
+			del total_tweets[dev_tweet]
+		else:
+			total_tweets[dev_tweet] = cleaned_dev_tweets[dev_tweet]
+
+	ids = list(total_tweets.keys())
+
+	for test_tweet in cleaned_test_tweets:
+		if test_tweet in ids and cleaned_test_tweets[test_tweet][0] != total_tweets[test_tweet][0]:
+			del total_tweets[test_tweet]
+		else:
+			total_tweets[test_tweet] = cleaned_test_tweets[test_tweet]
+
+	print("Merged set has", len(total_tweets), "tweets")
+
+	labels = [total_tweets[tweet][0] for tweet in total_tweets]
+
+	count_labels = Counter(labels)
+
+	print(count_labels)
+
+	#split train data to train, val, dev and test sets
+	#split randomly, change later
 	random.seed(42)
-	keys = list(cleaned_train_tweets.keys())
+	keys = list(total_tweets.keys())
 	random.shuffle(keys)
 
-	train_split = int(numpy.floor(len(cleaned_train_tweets) * 0.75))
+	train_split = int(numpy.floor(len(total_tweets) * 0.7))
+	other_splits = int(numpy.floor(len(total_tweets) * 0.1))
 
 	train_keys = keys[:train_split]
-	val_keys = keys[train_split:]
+	val_keys = keys[train_split:train_split+other_splits]
+	dev_keys = keys[train_split+other_splits:train_split+other_splits+other_splits]
+	test_keys = keys[train_split+other_splits+other_splits:]
 
-	new_train_tweets = split_data(cleaned_train_tweets, train_keys)
-	val_tweets = split_data(cleaned_train_tweets, val_keys)
+	train_tweets = split_data(total_tweets, train_keys)
+	val_tweets = split_data(total_tweets, val_keys)
+	dev_tweets = split_data(total_tweets, dev_keys)
+	test_tweets = split_data(total_tweets, test_keys)
 
 	#create dataset folder
 	try:
@@ -90,16 +127,16 @@ def main():
 	os.makedirs("dataset/")
 
 	#write the resulted sets to tsv files
-	write_tsv(new_train_tweets, "./dataset/train_set.tsv")
+	write_tsv(train_tweets, "./dataset/train_set.tsv")
 	write_tsv(val_tweets, "./dataset/val_set.tsv")
-	write_tsv(cleaned_dev_tweets, "./dataset/dev_set.tsv")
-	write_tsv(cleaned_test_tweets, "./dataset/test_set.tsv")
+	write_tsv(dev_tweets, "./dataset/dev_set.tsv")
+	write_tsv(test_tweets, "./dataset/test_set.tsv")
 
 	print("Final dataset consists of:")
-	print("Train set:", len(new_train_tweets))
+	print("Train set:", len(train_tweets))
 	print("Val set:", len(val_tweets))
-	print("Dev set:", len(cleaned_dev_tweets))
-	print("Test set:", len(cleaned_test_tweets))
+	print("Dev set:", len(dev_tweets))
+	print("Test set:", len(test_tweets))
 
 
 
