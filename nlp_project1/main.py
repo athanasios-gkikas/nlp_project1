@@ -2,72 +2,71 @@ import os
 import model
 import random
 
-if __name__ == "__main__" :
+def test_case_custom_corpus() :
 
-    '''
-    
-    c = "I'm a Barbie girl in a Barbie's world. Life in plastic is fantastic. " \
-           "You can brush my hair and touch me everywhere. " \
-           "Imagination, life is your creation! " \
-           "Com' on Barbie, let's go partying! "
+    m = model.model()
 
-    sentectesArr = []
-    sentences = nltk.tokenize.sent_tokenize(c)
-    for sentence in sentences :
-        sentence = sentence.lower()
-        translator = str.maketrans('', '', ".,!?)(-")
-        sentence = sentence.translate(translator)
-        #translator = str.maketrans('\'', '_')
-        #sentence = sentence.translate(translator)
-        sentectesArr += (nltk.word_tokenize(sentence),)
+    tokens = ("*start1*", "*start2*", "a", "b", "*end*",) * 10
 
-    #lfTokens = low_freq_tokens(sentectesArr, 10)
-    #sentectesArr = remove_tokens(sentectesArr, lfTokens, "*UNK*")
+    unigram = m.get_ngram(tokens, 1)
+    bigram = m.get_ngram(tokens, 2)
+    trigram = m.get_ngram(tokens, 3)
+    voc = m.compute_counts([unigram, bigram, trigram])
+    m.set_voc(voc, 3)
 
-    st = list()
-    for i in range(1, 3) :
-        st += [str('*start' + str(i) + '*'), ]
+    query = [["a",],]
 
-    sequence = list()
+    print(m.probs(query, 3))
+    print(m.log_probs(query, 3))
 
-    for sentence in sentectesArr :
-        sequence.extend(st + sentence + ['*end*',])
+    return
 
-    trigrams = get_ngram(sequence, 3)
-    for (i,gram) in enumerate(trigrams):
-        print('Gram {0}: {1}'.format(i,gram))
-    '''
-    '''
-    for s in sentectesArr :
-        s = st + s + ['*end*',]
-        print(s)
-        trigrams = nltk.ngrams(s, 3)
-        #trigrams = get_ngram(s, 3)
-        for (i,gram) in enumerate(trigrams):
-            print('Gram {0}: {1}'.format(i,gram))
-    '''
-    '''
-    '''
+def test_case_full_corpus() :
 
     cwd = os.getcwd()
-    root = cwd + "//corpus//"
+    root = cwd + "//dataset//"
     corpus = root + "europarl.en"
 
     m = model.model(root)
-    m.build(corpus)
+    #m.build(corpus) # do not enable this
     m.load_counts()
-    queries = m.import_queries()
-    # print(queries[:2])
-    print(len(m.import_queries()))
-    print("Bigram CE: ", m.get_language_cross_entropy(queries[:100], 2, 35))
-    # print("Bigram PER: ", m.get_perplexity(queries[:100], 2))
-    # print("Trigram CE: ", m.get_language_cross_entropy(queries[:100], 3))
-    # print("Trigram PER: ", m.get_perplexity(queries[:100], 3))
-    # for l in range(0, 105, 5):
-    #     print("l:", l/100., " LANG CE: ", m.get_interpolated_language_cross_entropy(queries[:100], l/100.))
-    #     print("l:", l / 100., " LANG CE: ", m.get_interpolated_perplexity(queries[:100], l / 100.))
-    # probs1 = m.log_probs(queries, 2)
-    # for q in queries : random.shuffle(q)
-    # probs2 = m.log_probs(queries, 2)
-    # print(probs1)
-    # print(probs2)
+    #print("Tuning result: ", m.tune())
+
+    queries = [
+        ['i', 'think', 'that', 'the', 'honourable', 'member', 'raises', 'an', 'important', 'point'],
+        ['member', 'the', 'think', 'that', 'raises', 'i', 'important', 'an', 'honourable', 'point'],
+        ['it', 'possesses', 'political', 'economic', 'and', 'diplomatic', 'leverage'],
+        ['economic', 'it', 'leverage', 'and', 'diplomatic', 'possesses', 'political'],
+    ]
+
+    #queries = m.import_queries()
+    #for q in queries : print(q)
+
+    #print(m.get_kn_smoothing(queries[0], 10))
+
+    #print("Perplexity Bigram: ", m.perplexity(queries, 2))
+    #print("Unigram: ", m.language_cross_entropy(queries, 1))
+    #print("Bigram: ", m.language_cross_entropy(queries, 2))
+    #print("Bigram: ", m.perplexity(queries, 2))
+    #print("Trigram: ", m.language_cross_entropy(queries, 3))
+    #print("Trigram: ", m.perplexity(queries, 3))
+    #print("Interpolated: ", m.language_cross_entropy(queries, 3))
+    #print("Interpolated: ", m.perplexity(queries, 3))
+
+    #print(m.log_probs(queries, 1))
+    #print(m.log_probs(queries, 2))
+    print(m.log_probs(queries, 3))
+    #for q in queries :
+    #   random.shuffle(q)
+    #    print(q)
+
+    #print(m.log_probs(queries, 2))
+
+    #print(m.evaluate(queries))
+
+    return
+
+if __name__ == "__main__" :
+
+    #test_case_custom_corpus()
+    test_case_full_corpus()
