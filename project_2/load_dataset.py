@@ -113,17 +113,12 @@ def main():
 	keys = list(total_tweets.keys())
 	random.shuffle(keys)
 
-	train_split = int(numpy.floor(len(total_tweets) * 0.7))
-	other_splits = int(numpy.floor(len(total_tweets) * 0.1))
+	train_split = int(numpy.floor(len(total_tweets) * 0.8))
 
 	train_keys = keys[:train_split]
-	val_keys = keys[train_split:train_split+other_splits]
-	dev_keys = keys[train_split+other_splits:train_split+other_splits+other_splits]
-	test_keys = keys[train_split+other_splits+other_splits:]
+	test_keys = keys[train_split:]
 
 	train_tweets = split_data(total_tweets, train_keys)
-	val_tweets = split_data(total_tweets, val_keys)
-	dev_tweets = split_data(total_tweets, dev_keys)
 	test_tweets = split_data(total_tweets, test_keys)
 
 	#create dataset folder
@@ -135,14 +130,10 @@ def main():
 
 	#write the resulted sets to tsv files
 	write_tsv(train_tweets, "./dataset/train_set.tsv")
-	write_tsv(val_tweets, "./dataset/val_set.tsv")
-	write_tsv(dev_tweets, "./dataset/dev_set.tsv")
 	write_tsv(test_tweets, "./dataset/test_set.tsv")
 
 	print("Final dataset consists of:")
 	print("Train set:", len(train_tweets))
-	print("Val set:", len(val_tweets))
-	print("Dev set:", len(dev_tweets))
 	print("Test set:", len(test_tweets))
 
 
