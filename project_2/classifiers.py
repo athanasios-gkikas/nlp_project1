@@ -51,32 +51,28 @@ def find_emoticons_in_tweets(tweet):
 def main():
 
 	train_tweets = load_tsv("./dataset/train_set.tsv")
-	val_tweets = load_tsv("./dataset/val_set.tsv")
-	dev_tweets = load_tsv("./dataset/dev_set.tsv")
 	test_tweets = load_tsv("./dataset/test_set.tsv")
 
 	pr_train_tweets = process_tweets(train_tweets)
-	pr_val_tweets = process_tweets(val_tweets)
-	pr_dev_tweets = process_tweets(dev_tweets)
 	pr_test_tweets = process_tweets(test_tweets)
 
 	#get text of train and dev sets
 	x_train = [tweet[1] for tweet in list(pr_train_tweets.values())]
-	x_dev = [tweet[1] for tweet in list(pr_dev_tweets.values())]
+	x_test = [tweet[1] for tweet in list(pr_test_tweets.values())]
 
 	#get train and dev labels and transform them to numerical
 	y_train = [tweet[0] for tweet in list(pr_train_tweets.values())]
 	le = preprocessing.LabelEncoder()
 	le.fit(y_train)
 	y_train = le.transform(y_train)
-	y_dev = le.transform([tweet[0] for tweet in list(pr_dev_tweets.values())])
+	y_test = le.transform([tweet[0] for tweet in list(pr_test_tweets.values())])
 
 	#check parameters
 	#tune ngram_range, max_features
 	vectorizer = TfidfVectorizer(ngram_range = (1,2), max_features = 5000, sublinear_tf = True)
 
 	x_train_tfidf = vectorizer.fit_transform(x_train)
-	x_dev_tfidf = vectorizer.transform(x_dev)
+	x_test_tfidf = vectorizer.transform(x_test)
 
 	#add evaluation for all measures (like shown in the lab tutorial)
 	#add curves
@@ -90,8 +86,8 @@ def main():
 	print("train f1-score:", score)
 
 	#predict for dev
-	predictions_dev = baseline.predict(x_dev_tfidf)
-	score = f1_score(y_dev, predictions_dev, average = "macro")
+	predictions_test = baseline.predict(x_test_tfidf)
+	score = f1_score(y_test, predictions_test, average = "macro")
 	print("dev f1-score:", score)
 
 	#-------------------Logistic Regression classifier------------------------
@@ -103,8 +99,8 @@ def main():
 	print("train f1-score:", score)
 
 	#predict for dev
-	predictions_dev = clf.predict(x_dev_tfidf)
-	score = f1_score(y_dev, predictions_dev, average = "macro")
+	predictions_test = clf.predict(x_test_tfidf)
+	score = f1_score(y_test, predictions_test, average = "macro")
 	print("dev f1-score:", score)
 
 
