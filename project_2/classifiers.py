@@ -8,14 +8,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import learning_curve
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.dummy import DummyClassifier
+from sklearn.svm import LinearSVC, SVC, NuSVR
 from sklearn.metrics import f1_score
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import average_precision_score
 from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
-
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.decomposition import TruncatedSVD
+from time import time
 
 def load_tsv(filepath):
 	tweets = {}
@@ -147,67 +151,188 @@ def plot_precision_recall_curves(estimator, name, x_train, y_1, x_test, y_2):
 	plt.show()
 	return
 
+def encodeSet(pSet) :
+
+    x = [s[1] for s in list(pSet.values())]
+    y = [s[0] for s in list(pSet.values())]
+    le = preprocessing.LabelEncoder()
+    le.fit(y)
+    y = le.transform(y)
+
+    return x, y
+
+def tuner(pTrain, pPipeline, pParams) :
+
+    grid = GridSearchCV(pPipeline,
+        param_grid=pParams, cv=5, n_jobs=-1, verbose=1)
+
+    t0 = time()
+
+    grid.fit(pTrain[0], pTrain[1])
+
+    print("done in %0.3fs" % (time() - t0))
+
+    print("Best score: %0.3f" % grid.best_score_)
+    print("Best parameters set:")
+    best_parameters = grid.best_estimator_.get_params()
+
+    for param_name in sorted(pParams.keys()):
+        print("\t%s: %r" % (param_name, best_parameters[param_name]))
+
+    return grid.best_estimator_.named_steps['clf']
+
+def tuneSVC(pTrain) :
+
+    pipeline = Pipeline([
+        ('clf',  OneVsRestClassifier(SVC(
+            class_weight="balanced",
+            max_iter=1000,
+            gamma='scale',
+            random_state=0))),])
+
+    parameters = {
+        'clf__estimator__kernel' : ['linear', 'rbf', 'poly'],
+        'clf__estimator__C' : [0.01, 0.1, 1.0, 10.0, 100.0],}
+
+    return tuner(pTrain, pipeline, parameters)
+
+def tuneSGD(pTrain) :
+
+    pipeline = Pipeline([
+        ('clf', OneVsRestClassifier(SGDClassifier(
+            max_iter=10000,
+            tol=1.e-4,
+            n_jobs=-1,
+            class_weight='balanced',
+            random_state=0))),])
+
+    parameters = {
+        'clf__estimator__penalty': ['l2', 'elasticnet'],
+        'clf__estimator__l1_ratio': [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        'clf__estimator__loss': ['modified_huber', 'perceptron'],}
+
+    return tuner(pTrain, pipeline, parameters)
+
+def tuneBase(pTrain) :
+
+    pipeline = Pipeline([
+        ('clf',  DummyClassifier(strategy = "most_frequent", random_state=0)),])
+
+    parameters = { 'clf__strategy': ['most_frequent', 'stratified'], }
+
+    return tuner(pTrain, pipeline, parameters)
+
+def tuneLogistic(pTrain) :
+
+    pipeline = Pipeline([
+        ('clf',  LogisticRegression(
+            class_weight="balanced",
+            max_iter=10000,
+            n_jobs=-1,
+            random_state=0,
+            multi_class='multinomial',
+            penalty='l2')),])
+
+    parameters = {
+        'clf__solver': ['newton-cg', 'lbfgs', 'sag',],
+        'clf__C' : [0.01, 0.1, 1.0, 10.0,]}
+
+    return tuner(pTrain, pipeline, parameters)
+
+def approxDim(pData) :
+
+    maxFeatures = tuple()
+    #(700, 1225, 1500, 2000, 2200, 2275, 2650, 3025, 2850, 3162, 3475, 3787, 3700)
+
+    for f in range(1000, 14000, 1000) :
+        print("num features: ", f)
+
+        vectorizer = TfidfVectorizer(
+            use_idf=True,
+            smooth_idf=True,
+            sublinear_tf=True,
+            norm='l2',
+            ngram_range=(1,3),
+            max_features=f)
+
+        tfidf = vectorizer.fit_transform(pData)
+
+        svd = TruncatedSVD(n_components=1, n_iter=1, random_state=0)
+        left = 100
+        right = f - 100
+
+        while True :
+            c = (left + right) // 2
+            svd = TruncatedSVD(n_components=c, n_iter=1, random_state=0)
+            svd.fit(tfidf)
+            var = svd.explained_variance_ratio_.sum()
+            if var > 0.88 and var < 0.93 :
+                print(c)
+                maxFeatures += (c,)
+                break
+            elif var > 0.93 :
+                right = c
+            else :
+                left = c
+
+    print(maxFeatures)
+    arr = np.array(maxFeatures).transpose()
+    x = np.arange(1000, 14000, 1000)
+
+    fig, ax = plt.subplots()
+    ax.plot(x, arr)
+    ax.set(xlabel='initial domain', ylabel='projected domain')
+    ax.grid()
+    plt.show()
+
+    fig, ax = plt.subplots()
+    ax.plot(x, arr / x)
+    ax.set(xlabel='ratio', ylabel='domain')
+    ax.grid()
+    plt.show()
+
+    arr = np.log(arr)
+
+    return int(np.exp(arr.sum() / len(arr)))
 
 def main():
-	train_tweets = load_tsv("./dataset/train_set.tsv")
-	test_tweets = load_tsv("./dataset/test_set.tsv")
 
-	pr_train_tweets = process_tweets(train_tweets)
-	pr_test_tweets = process_tweets(test_tweets)
+    cwd = os.getcwd()
+    train_tweets = load_tsv(cwd + "/project_2/dataset/train_set.tsv")
+    test_tweets = load_tsv(cwd + "/project_2/dataset/test_set.tsv")
 
-	# Get text of train and dev sets
-	x_train = [tweet[1] for tweet in list(pr_train_tweets.values())]
-	x_test = [tweet[1] for tweet in list(pr_test_tweets.values())]
+    pr_train_tweets = process_tweets(train_tweets)
+    pr_test_tweets = process_tweets(test_tweets)
 
-	# Get train and dev labels and transform them to numerical
-	y_train = [tweet[0] for tweet in list(pr_train_tweets.values())]
-	le = preprocessing.LabelEncoder()
-	le.fit(y_train)
-	y_train = le.transform(y_train)
-	y_test = le.transform([tweet[0] for tweet in list(pr_test_tweets.values())])
+    x_train, y_train = encodeSet(pr_train_tweets)
+    x_test, y_test = encodeSet(pr_test_tweets)
 
-	# check parameters
-	# tune ngram_range, max_features
-	vectorizer = TfidfVectorizer(ngram_range=(1, 2), max_features=5000, sublinear_tf=True)
+    f = 2281 #approxDim(y_train)
+    vectorizer = TfidfVectorizer(
+        use_idf=True,
+        smooth_idf=True,
+        sublinear_tf=True,
+        norm='l2',
+        ngram_range=(1,3),
+        max_features=f)
 
-	x_train_tfidf = vectorizer.fit_transform(x_train)
-	x_test_tfidf = vectorizer.transform(x_test)
+    vectorizer.fit(x_train)
+    x_train = vectorizer.transform(x_train)
+    x_test = vectorizer.transform(x_test)
 
-	# add evaluation for all measures (like shown in the lab tutorial)
-	# add curves
+    #model = tuneBase([x_train, y_train])
+    model = tuneSVC([x_train, y_train])
+    #model = tuneSGD([x_train, y_train])
+    #model = tuneLogistic([x_train, y_train])
 
-	# ------------------------Most frequent classifier-----------------------------
-	baseline = DummyClassifier(strategy="most_frequent")
-	baseline.fit(x_train_tfidf, y_train)
-	# Predict for train
-	predictions_train = baseline.predict(x_train_tfidf)
-	score = f1_score(y_train, predictions_train, average="macro")
-	print("train f1-score:", score)
+    plot_learning_curve(model,
+        "Learning Curves for Logistic Regression",
+        x_train, y_train, (0.1, 1.01), cv=5,
+        n_jobs=-1).show()
 
-	# Predict for dev
-	predictions_test = baseline.predict(x_test_tfidf)
-	score = f1_score(y_test, predictions_test, average="macro")
-	print("dev f1-score:", score)
-
-	# -------------------Logistic Regression classifier------------------------
-	clf = LogisticRegression(solver='lbfgs', multi_class='multinomial', class_weight="balanced")
-	clf.fit(x_train_tfidf, y_train)
-	# Predict for train
-	predictions = clf.predict(x_train_tfidf)
-	score = f1_score(y_train, predictions, average="macro")
-	print("train f1-score:", score)
-
-	# Predict for dev
-	predictions_test = clf.predict(x_test_tfidf)
-	score = f1_score(y_test, predictions_test, average="macro")
-	print("dev f1-score:", score)
-
-	plot_learning_curve(baseline, "Learning Curves for DummyClassifier", x_train_tfidf, y_train, (0.1, 1.01), cv=None,
-	                    n_jobs=-1).show()
-	plot_learning_curve(clf, "Learning Curves for Logistic Regression", x_train_tfidf, y_train, (0.1, 1.01), cv=None,
-	                    n_jobs=-1).show()
-	plot_precision_recall_curves(clf, "Logistic Regression", x_train_tfidf, y_train, x_test_tfidf, y_test)
-
+    plot_precision_recall_curves(model,
+        "Logistic Regression",
+        x_train, y_train, x_test, y_test)
 
 if __name__ == "__main__":
 	main()
