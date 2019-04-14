@@ -36,15 +36,6 @@ class Metrics(Callback) :
 
         self.getMetrics(self.model)
 
-        #self.getMetrics(epoch, prediction, gt)
-
-        #macro_fscore = np.mean(self.fscores[epoch,:])
-
-        #print(" val macro-fscore: ", "{0:.4f}".format(macro_fscore))
-
-        #if(macro_ji > 0.98) :
-        #    self.model.stop_training = True
-
         return
 
     def on_batch_end(self, batch, logs={}) :

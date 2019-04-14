@@ -78,9 +78,9 @@ def exportCorpus(pWindow = 5):
 
 	cwd = os.getcwd()
 
-	train_path = cwd + "/dataset/en_partut-ud-train.conllu"
-	dev_path = cwd + "/dataset/en_partut-ud-dev.conllu"
-	test_path = cwd + "/dataset/en_partut-ud-test.conllu"
+	train_path = cwd + "/dataset/en_ewt-ud-train.conllu"
+	dev_path = cwd + "/dataset/en_ewt-ud-dev.conllu"
+	test_path = cwd + "/dataset/en_ewt-ud-test.conllu"
 
 	train_data = pyconll.load_from_file(train_path)
 	dev_data = pyconll.load_from_file(dev_path)
