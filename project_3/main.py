@@ -12,8 +12,8 @@ def main() :
 
     cwd = os.getcwd()
     trainX, trainY = data_loaders.import_embeddings("train")
-    valX, valY = data_loaders.import_embeddings("test")
-    devX, devY = data_loaders.import_embeddings("dev")
+    valX, valY = data_loaders.import_embeddings("val")
+    devX, devY = data_loaders.import_embeddings("test")
 
     encoder = LabelEncoder()
     encoder.classes_ = np.load(cwd + "/dataset/labelEncoder.npz")['arr_0']
