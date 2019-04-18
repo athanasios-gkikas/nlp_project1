@@ -8,6 +8,7 @@ import gensim
 import numpy as np
 import os
 
+
 def export_word2vec_dataset() :
 
     data_loaders.exportCorpus()

@@ -7,6 +7,7 @@ import data_loaders
 import metrics
 import matplotlib.pyplot as plt
 from keras.callbacks import CSVLogger
+from keras import backend as k
 import numpy as np
 
 def train_mlp1(pTrain, pVal, pLabelEnc) :
@@ -34,7 +35,7 @@ def train_mlp1(pTrain, pVal, pLabelEnc) :
     model.compile(
         optimizer=Adam(lr=0.001),
         loss='categorical_crossentropy',
-        metrics=['categorical_accuracy'])
+        metrics=['categorical_accuracy', recall, precision, f1])
 
     model.summary()
 
@@ -92,3 +93,22 @@ def plot_history(hs, epochs, metric):
     plt.legend()
     plt.show()
 
+
+def recall(y_true, y_pred):
+    true_positives = k.sum(k.round(k.clip(y_true * y_pred, 0, 1)))
+    possible_positives = k.sum(k.round(k.clip(y_true, 0, 1)))
+    recall_val = true_positives / (possible_positives + k.epsilon())  # k.epsilon to avoid division by zero
+    return recall_val
+
+
+def precision(y_true, y_pred):
+    true_positives = k.sum(k.round(k.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = k.sum(k.round(k.clip(y_pred, 0, 1)))
+    precision_val = true_positives / (predicted_positives + k.epsilon())
+    return precision_val
+
+
+def f1(y_true, y_pred):
+    precision_val = precision(y_true, y_pred)
+    recall_val = recall(y_true, y_pred)
+    return 2*((precision_val * recall_val) / (precision_val + recall_val + k.epsilon()))
