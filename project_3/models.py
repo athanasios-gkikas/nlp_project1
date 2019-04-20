@@ -2,6 +2,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation, Dropout
 from keras.optimizers import Adam
 from keras.callbacks import CSVLogger
+from sklearn.utils import class_weight
 
 import data_generators
 import data_loaders
@@ -36,10 +37,21 @@ def train_model(pModel, pTrain, pVal, pLabelEnc) :
 
     y = np.argmax(pTrain[1], axis=1)
 
+    freq = np.zeros([1, len(pLabelEnc.classes_)])
+
     for i in range(0, len(pLabelEnc.classes_)) :
         mask = np.count_nonzero(y == i)
-        print(i, " ", pLabelEnc.inverse_transform([i]), " ", mask, " ",
-            "{0:.2}".format(mask / pTrain[1].shape[0]))
+        freq[0,i] = mask / pTrain[1].shape[0]
+
+    weight = np.median(freq) / freq
+
+    for i in range(0, len(pLabelEnc.classes_)) :
+        mask = np.count_nonzero(y == i)
+        percentage = mask / pTrain[0].shape[0]
+
+        print(i, " ", pLabelEnc.inverse_transform([i]), " ",
+            "{0:.2}%".format(percentage * 100.0),
+            " weight: {0:.2}".format(weight[0,i]))
 
     pModel.summary()
 
@@ -52,7 +64,7 @@ def train_model(pModel, pTrain, pVal, pLabelEnc) :
             metrics.Metrics(len(pLabelEnc.classes_), (pVal[0], pVal[1]), pLabelEnc),
             csv_logger,],
         validation_data=(pVal[0], pVal[1]),
-        epochs=epochs, batch_size=128, verbose=1)
+        epochs=epochs, batch_size=128, verbose=1,)
 
     pModel.save('dataset/' + pModel.name)
 
