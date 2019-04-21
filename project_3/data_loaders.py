@@ -10,6 +10,7 @@ import numpy as np
 def load_data(pData) :
 
 	pos_data = []
+
 	for sentence in pData:
 		token_list = []
 		for token in sentence:
