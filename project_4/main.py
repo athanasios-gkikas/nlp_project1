@@ -2,9 +2,9 @@ import pos_model
 
 def main() :
     model = pos_model.PoStagger()
-    model.compile_dataset()
+    #model.compile_dataset()
     model.compile_model()
-    #model.train_model()
+    model.train_model()
 
     return
 

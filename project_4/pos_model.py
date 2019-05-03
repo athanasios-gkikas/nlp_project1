@@ -7,6 +7,8 @@ import pyconll
 import gzip
 import json
 import gc
+import data_generator
+import math
 
 from random import shuffle
 from sklearn.preprocessing import LabelEncoder
@@ -153,7 +155,7 @@ class PoStagger :
         blstm1 = Bidirectional(GRU(self.seqLen, return_sequences=True, name='lstm1'))(elmo)
         blstm2 = Bidirectional(GRU(self.seqLen, return_sequences=True, name='lstm2'))(blstm1)
         output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(blstm2)
-        model = Model(inputs=[inputs,], outputs=[output,])
+        model = Model(inputs=inputs, outputs=output)
         model.compile(optimizer=Adam(), loss='categorical_crossentropy')
         model.summary()
 
@@ -163,6 +165,14 @@ class PoStagger :
     def train_model(self) :
         trainX, trainY = self.import_arr(self.root + "train")
         devX, devY = self.import_arr(self.root + "dev")
+        '''
+        trainX = trainX[:1000]
+        trainY = trainY[:1000]
+        devX = devX[:1000]
+        devY = devY[:1000]
+        '''
+        train_gen = data_generator.data_stream([trainX, trainY], self.batchSize, self.numClasses())
+        dev_gen = data_generator.data_stream([devX, devY], self.batchSize, self.numClasses())
 
         stopper = EarlyStopping(monitor='val_loss',
             min_delta=0, patience=5,
@@ -171,16 +181,23 @@ class PoStagger :
 
         csv_logger = CSVLogger(self.root + 'logger.log')
 
-        self.model.fit(x=trainX, y=trainY,
-            validation_data=(devX, devY),
-            batch_size=self.batchSize, epochs=100, verbose=1,
-            callbacks=[stopper, csv_logger,
-                metrics.Metrics((devX, devY), self.labelEncoder),],)
+        self.model.fit_generator(
+            generator           = train_gen,
+            steps_per_epoch     = math.ceil(len(trainX) / self.batchSize),
+            validation_data     = dev_gen,
+            validation_steps    = math.ceil(len(devX) / self.batchSize),
+            callbacks           = [ \
+                metrics.Metrics((devX, devY), self.batchSize, self.labelEncoder), \
+                stopper, csv_logger],
+            epochs              = 100,
+            verbose             = 1,
+            max_queue_size      = 100,
+            workers             = 1,
+            use_multiprocessing = False,)
 
         self.model.save_weights(self.root + "model_weights")
         return
 
     def tune_model(self) :
         valX, valY = self.import_arr(self.root + "val")
-
         return

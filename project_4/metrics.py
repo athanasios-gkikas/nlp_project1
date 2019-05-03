@@ -4,26 +4,54 @@ from sklearn.metrics import classification_report
 from keras import backend as K
 from gensim.models import KeyedVectors
 
+import data_generator
 import sklearn.metrics as sk_metrics
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import csv
+import math
 
 class Metrics(Callback) :
 
-    def __init__(self, pValSet, pLabelEnc, **kwargs):
+    def __init__(self, pValSet, pBatchSize, pLabelEnc, **kwargs):
         super(Metrics, self).__init__(**kwargs)
         self.valX = pValSet[0]
         self.valY = np.argmax(pValSet[1], axis=2).ravel()
         self.labelEnc = pLabelEnc
+        self.tags = self.labelEnc.inverse_transform( \
+            [tag for tag in range(len(self.labelEnc.classes_))])
+        self.batchSize = pBatchSize
 
     def getMetrics(self, pModel) :
-        prediction = pModel.predict(self.valX, steps=1,)
-        pred = np.argmax(prediction, axis=2).ravel()
+        pred = np.zeros(self.valY.shape, dtype=int)
+        batches = math.ceil(self.valX.shape[0] / self.batchSize)
+        seqLen = self.valX.shape[1]
+
+        for i in range(batches) :
+            sample = np.zeros((self.batchSize, seqLen), dtype=self.valX.dtype)
+
+            offset = i * self.batchSize
+            end = offset + self.batchSize
+
+            if end > self.valX.shape[0]:
+                tmp = self.valX[offset:, :]
+                sample[:tmp.shape[0], :] = tmp
+            else :
+                sample = self.valX[offset:end, :]
+
+            prediction = np.argmax(pModel.predict(sample, steps=1), axis=2).ravel()
+
+            offset = i * seqLen * self.batchSize
+            end = offset + seqLen * self.batchSize
+
+            if end > pred.shape[0] :
+                pred[offset:] = prediction[:pred.shape[0] - offset]
+            else :
+                pred[offset:end] = prediction
+
         print(classification_report(self.valY, pred,
-            target_names=self.labelEnc.inverse_transform( \
-            [tag for tag in range(0, len(self.labelEnc.classes_))])))
+            target_names=self.tags))
 
         return None, None
 
