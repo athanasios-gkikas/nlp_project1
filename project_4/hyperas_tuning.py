@@ -12,7 +12,8 @@ import os
 import layers
 import numpy as np
 import tensorflow as tf
-
+import data_generator
+import math
 
 def data():
     cwd = os.getcwd()
@@ -20,20 +21,19 @@ def data():
     valX = val_data['a']
     valY = val_data['b']
 
-    pTrainX, pTestX, pTrainY, pTestY = train_test_split(valX, valY, test_size=0.2, random_state=11)
-
+    pTrainX, pTestX, pTrainY, pTestY = train_test_split(valX, valY, test_size=0.2)
     encoder = LabelEncoder()
     encoder.classes_ = np.load(cwd + "/dataset/labelEncoder.npz")['arr_0']
-
-    return np.array(pTrainX), np.array(pTrainY), np.array(pTestX), np.array(pTestY), encoder
+    return pTrainX, pTrainY, pTestX, pTestY, encoder
 
 
 def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
 
-    batch_size = {{choice([64, 128])}}
+    inputs = Input(shape=(50,), name='input', dtype=tf.string)
+    elmo = layers.ElmoLayer(50, 128)(inputs)
 
     inputs = Input(shape=(50,), name='input', dtype=tf.string)
-    elmo = layers.ElmoLayer(50, batch_size)(inputs)
+    elmo = layers.ElmoLayer(50, 128)(inputs)
     dropout1 = SpatialDropout1D({{choice([0.0, 0.2, 0.5])}})(elmo)
     blstm1 = Bidirectional(GRU(50, return_sequences=True, name='lstm1'))(dropout1)
     dropout2 = SpatialDropout1D({{choice([0.0, 0.2, 0.5])}})(blstm1)
@@ -41,9 +41,9 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
 
     if {{choice(['two', 'three'])}} == "three":
         blstm3 = Bidirectional(GRU(50, return_sequences=True, name='lstm2'))(blstm2)
-        output = TimeDistributed(Dense(encoder.classes_, activation='softmax'))(blstm3)
+        output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(blstm3)
     else:
-        output = TimeDistributed(Dense(encoder.classes_, activation='softmax'))(blstm2)
+        output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(blstm2)
 
     model = Model(inputs=inputs, outputs=output)
 
@@ -52,18 +52,33 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
         loss='categorical_crossentropy',
         metrics=['categorical_accuracy'])
 
-    result = model.fit(pTrainX, pTrainY,
-                       epochs=20,
-                       batch_size=batch_size,
-                       validation_data=(pTestX, pTestY),
-                       callbacks=[EarlyStopping(monitor='val_loss',
-                                                min_delta=0, patience=2, verbose=0, mode='auto')],
-                       verbose=1)
+    train_gen = data_generator.data_stream([pTrainX, pTrainY], 128, len(encoder.classes_))
+    dev_gen = data_generator.data_stream([pTestX, pTestY], 128, len(encoder.classes_))
 
-    score, acc = model.evaluate(pTestX, pTestY, verbose=0)
+    stopper = EarlyStopping(monitor='val_loss',
+                            min_delta=0, patience=3,
+                            verbose=0, mode='auto',
+                            restore_best_weights=True)
+
+    model.fit_generator(
+        generator=train_gen,
+        steps_per_epoch=math.ceil(len(pTrainX) / 128),
+        validation_data=dev_gen,
+        validation_steps=math.ceil(len(pTestX) / 128),
+        callbacks=[stopper, ],
+        epochs=10,
+        verbose=1,
+        max_queue_size=100,
+        workers=1,
+        use_multiprocessing=False, )
+
+    score, acc = model.evaluate_generator(
+        generator=dev_gen,
+        steps=math.ceil(len(pTestX) / 128),
+        verbose=0)
+
     print('Best val acc of epoch:', acc)
     return {'loss': -acc, 'status': STATUS_OK, 'model': model}
-
 
 def main():
     best_run, best_model = optim.minimize(model=create_model,
