@@ -29,20 +29,17 @@ def data():
 
 def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
 
-    inputs = Input(shape=(50,), name='input', dtype=tf.string)
-    elmo = layers.ElmoLayer(50, 128)(inputs)
-    dropped_embeddings = Dropout({{choice([0.0, 0.2, 0.5])}})(elmo)
-    var_dropout1 = {{choice([0.0, 0.2, 0.5])}}
-    blstm1 = Bidirectional(GRU(50, dropout=var_dropout1, recurrent_dropout=var_dropout1, return_sequences=True, name='lstm1'))(dropped_embeddings)
-    dropout2 = Dropout({{choice([0.0, 0.2, 0.5])}})(blstm1)
-    blstm2 = Bidirectional(GRU(50, return_sequences=True, name='lstm2'))(dropout2)
+    batchSize = 111
+    seq = 25
+    inputs = Input(shape=(seq,), name='input', dtype=tf.string)
+    elmo = layers.ElmoLayer(seq, batchSize)(inputs)
+    gru1 = Bidirectional(GRU(seq, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='gru1'))(elmo)
 
     if {{choice(['two', 'three'])}} == "three":
-        var_dropout2 = {{choice([0.0, 0.2, 0.5])}}
-        blstm3 = Bidirectional(GRU(50, dropout=var_dropout2, recurrent_dropout=var_dropout2, return_sequences=True, name='lstm2'))(blstm2)
-        output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(blstm3)
+        gru2 = Bidirectional(GRU(50, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='lstm2'))(gru1)
+        output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(gru2)
     else:
-        output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(blstm2)
+        output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(gru1)
 
     model = Model(inputs=inputs, outputs=output)
 
@@ -51,8 +48,8 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
         loss='categorical_crossentropy',
         metrics=['categorical_accuracy'])
 
-    train_gen = data_generator.data_stream([pTrainX, pTrainY], 128, len(encoder.classes_))
-    dev_gen = data_generator.data_stream([pTestX, pTestY], 128, len(encoder.classes_))
+    train_gen = data_generator.data_stream([pTrainX, pTrainY], batchSize, len(encoder.classes_))
+    dev_gen = data_generator.data_stream([pTestX, pTestY], batchSize, len(encoder.classes_))
 
     stopper = EarlyStopping(monitor='val_loss',
                             min_delta=0, patience=3,
@@ -61,9 +58,9 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
 
     model.fit_generator(
         generator=train_gen,
-        steps_per_epoch=math.ceil(len(pTrainX) / 128),
+        steps_per_epoch=math.ceil(len(pTrainX) / batchSize),
         validation_data=dev_gen,
-        validation_steps=math.ceil(len(pTestX) / 128),
+        validation_steps=math.ceil(len(pTestX) / batchSize),
         callbacks=[stopper, ],
         epochs=10,
         verbose=1,
@@ -73,7 +70,7 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
 
     score, acc = model.evaluate_generator(
         generator=dev_gen,
-        steps=math.ceil(len(pTestX) / 128),
+        steps=math.ceil(len(pTestX) / batchSize),
         verbose=0)
 
     print('Best val acc of epoch:', acc)
