@@ -36,7 +36,7 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
     gru1 = Bidirectional(GRU(seq, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='gru1'))(elmo)
 
     if {{choice(['two', 'three'])}} == "three":
-        gru2 = Bidirectional(GRU(50, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='lstm2'))(gru1)
+        gru2 = Bidirectional(GRU(seq, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='lstm2'))(gru1)
         output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(gru2)
     else:
         output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(gru1)

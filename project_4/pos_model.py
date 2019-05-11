@@ -24,7 +24,7 @@ from nltk import ngrams
 
 class PoStagger:
 
-    def __init__(self, seq_len=50):
+    def __init__(self, seq_len=25):
         self.model = None
         self.seqLen = seq_len
         self.batchSize = 128
@@ -153,9 +153,9 @@ class PoStagger:
 
         inputs = Input(shape=(self.seqLen,), name='input', dtype=tf.string)
         elmo = layers.ElmoLayer(self.seqLen, self.batchSize)(inputs)
-        blstm1 = Bidirectional(GRU(self.seqLen, return_sequences=True, name='lstm1'))(elmo)
-        blstm2 = Bidirectional(GRU(self.seqLen, return_sequences=True, name='lstm2'))(blstm1)
-        output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(blstm2)
+        gru1 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru1'))(elmo)
+        gru2 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru2'))(gru1)
+        output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(gru2)
         model = Model(inputs=inputs, outputs=output)
         model.compile(optimizer=Adam(), loss='categorical_crossentropy')
         model.summary()
@@ -190,15 +190,11 @@ class PoStagger:
             callbacks=[ \
                 metrics.Metrics((devX, devY), self.batchSize, self.labelEncoder), \
                 stopper, csv_logger],
-            epochs=100,
+            epochs=2,
             verbose=1,
             max_queue_size=100,
             workers=1,
             use_multiprocessing=False, )
 
         self.model.save_weights(self.root + "model_weights")
-        return
-
-    def tune_model(self):
-        valX, valY = self.import_arr(self.root + "val")
         return

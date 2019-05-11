@@ -11,6 +11,8 @@ import numpy as np
 import os
 import csv
 import math
+import json
+import gzip
 
 class Metrics(Callback) :
 
@@ -22,6 +24,7 @@ class Metrics(Callback) :
         self.tags = self.labelEnc.inverse_transform( \
             [tag for tag in range(len(self.labelEnc.classes_))])
         self.batchSize = pBatchSize
+        self.mReport = []
 
     def getMetrics(self, pModel) :
         pred = np.zeros(self.valY.shape, dtype=int)
@@ -53,30 +56,15 @@ class Metrics(Callback) :
         print(classification_report(self.valY, pred,
             target_names=self.tags))
 
-        return None, None
+        return classification_report(self.valY, pred,
+            target_names=self.tags, output_dict=True)
 
     def on_epoch_begin(self, epoch, logs=None) :
         pass
 
     def on_epoch_end(self, epoch, logs=None) :
-
-        per_class_metrics, macro_metrics = self.getMetrics(self.model)
-        return
-        self.per_class_history[epoch, :,:] = per_class_metrics
-        self.macro_history[epoch, :] = macro_metrics
-
-        for i in range(0, self.numClasses) :
-
-            label = self.labelEnc.inverse_transform([i])
-
-            print(i, "class ", label,
-                " precision: {0:.4f}".format(self.per_class_history[epoch,i,0]),
-                " recall: {0:.4f}".format(self.per_class_history[epoch,i,1]),
-                " f1: {0:.4f}".format(self.per_class_history[epoch,i,2]),)
-
-        print("With <UNK> macro f1: {0:.4f}".format(self.macro_history[epoch, 2]))
-        print("Without <UNK> macro f1: {0:.4f}".format(self.macro_history[epoch, 3]))
-
+        report = self.getMetrics(self.model)
+        self.mReport.append(report)
         return
 
     def on_batch_end(self, batch, logs=None) :
@@ -86,9 +74,8 @@ class Metrics(Callback) :
         pass
 
     def on_train_end(self, logs=None) :
-        #cwd = os.getcwd()
-        #np.savez_compressed(cwd + "/dataset/per_class_history", self.per_class_history)
-        #np.savez_compressed(cwd + "/dataset/macro_history", self.macro_history)
+        with gzip.GzipFile(os.getcwd() + "dataset\\report.json.gz", "wb") as file:
+            file.write(json.dumps(self.mReport, indent=4).encode('utf-8'))
         return
 
 def evaluate_model(pModel, pTest, pEncoder) :
