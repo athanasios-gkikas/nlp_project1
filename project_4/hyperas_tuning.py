@@ -4,8 +4,8 @@ from keras.callbacks import EarlyStopping
 from hyperas import optim
 from hyperas.distributions import choice, uniform
 from keras.models import Model
-from keras.layers import Input, Embedding, Dropout, Bidirectional, LSTM, GRU, Dense, TimeDistributed, SpatialDropout1D
-from keras.callbacks import CSVLogger, EarlyStopping
+from keras.layers import Input, Dropout, Bidirectional, GRU, Dense, TimeDistributed
+from keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import os
@@ -31,16 +31,15 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
 
     inputs = Input(shape=(50,), name='input', dtype=tf.string)
     elmo = layers.ElmoLayer(50, 128)(inputs)
-
-    inputs = Input(shape=(50,), name='input', dtype=tf.string)
-    elmo = layers.ElmoLayer(50, 128)(inputs)
-    dropout1 = SpatialDropout1D({{choice([0.0, 0.2, 0.5])}})(elmo)
-    blstm1 = Bidirectional(GRU(50, return_sequences=True, name='lstm1'))(dropout1)
-    dropout2 = SpatialDropout1D({{choice([0.0, 0.2, 0.5])}})(blstm1)
+    dropped_embeddings = Dropout({{choice([0.0, 0.2, 0.5])}})(elmo)
+    var_dropout1 = {{choice([0.0, 0.2, 0.5])}}
+    blstm1 = Bidirectional(GRU(50, dropout=var_dropout1, recurrent_dropout=var_dropout1, return_sequences=True, name='lstm1'))(dropped_embeddings)
+    dropout2 = Dropout({{choice([0.0, 0.2, 0.5])}})(blstm1)
     blstm2 = Bidirectional(GRU(50, return_sequences=True, name='lstm2'))(dropout2)
 
     if {{choice(['two', 'three'])}} == "three":
-        blstm3 = Bidirectional(GRU(50, return_sequences=True, name='lstm2'))(blstm2)
+        var_dropout2 = {{choice([0.0, 0.2, 0.5])}}
+        blstm3 = Bidirectional(GRU(50, dropout=var_dropout2, recurrent_dropout=var_dropout2, return_sequences=True, name='lstm2'))(blstm2)
         output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(blstm3)
     else:
         output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(blstm2)
