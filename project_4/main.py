@@ -1,11 +1,14 @@
 import pos_model
+import metrics
 
 def main() :
     model = pos_model.PoStagger()
-    #model.compile_dataset()
+    model.compile_dataset()
     model.compile_model()
-    #model.train_model()
+    model.train_model()
     model.load_model()
+    metrics.evaluate_model(model)
+    model.test_model()
 
     print(model.predict(['Feels', 'like', 'you', 'are', 'in', 'Brooklyn', ',', 'but', 'people', 'watching', 'is', 'entertaining', '.']))
     print(model.predict(['We', 'honestly', 'can', 'not', 'think', 'of', 'even', '1', 'thing', 'we', 'did', 'n\'t', 'like', '!']))
@@ -18,7 +21,8 @@ def main() :
     print(model.predict([ "I", "love", "you", "."]))
     print(model.predict(["I", "am", "in", "love", "with", "the", "giant", "plate", "of", "nachos" "!"]))
     print(model.predict(["Would", "love", "for", "you", "to", "join", "us", "."]))
-    #model.test_model()
+    print(model.predict(["Let", "'s", "make", "love", "."]))
+
     return
 
 if __name__ == "__main__" :

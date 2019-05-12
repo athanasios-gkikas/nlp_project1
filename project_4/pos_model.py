@@ -9,6 +9,7 @@ import json
 import gc
 import data_generator
 import math
+import metrics
 
 from random import shuffle
 from sklearn.preprocessing import LabelEncoder
@@ -163,7 +164,7 @@ class PoStagger:
     def test_model(self) :
         devX, devY = self.import_arr(self.root + "test")
         metric = metrics.Metrics((devX, devY), self.batchSize, self.labelEncoder)
-        metric.getMetrics(self.model)
+        metric.get_metrics(self.model)
         return
 
     def compile_base_model(self) :
@@ -180,7 +181,10 @@ class PoStagger:
         bn2 = BatchNormalization()(gru2)
         output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(bn2)
         model = Model(inputs=inputs, outputs=output)
-        model.compile(optimizer=Adam(), loss='categorical_crossentropy')
+        model.compile(
+            optimizer=Adam(),
+            loss='categorical_crossentropy',
+            metrics=['categorical_accuracy',])
         model.summary()
 
         self.model = model
