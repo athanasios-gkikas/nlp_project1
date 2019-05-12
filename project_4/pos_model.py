@@ -152,14 +152,13 @@ class PoStagger:
         for i in range(len(pSentence), self.seqLen):
             sentence.append('__PAD__')
 
-        sample = np.zeros((self.batchSize, self.seqLen), dtype='S')
+        sample = np.zeros((self.batchSize, self.seqLen), dtype='|S6')
         sample[0,:] = sentence
 
-        prediction = np.argmax(
-            self.model.predict(sample, steps=1)[0, :], axis=1).ravel()
+        prediction = self.model.predict(sample, steps=1)
+        prediction = np.argmax(prediction[0, :], axis=1).ravel()
 
-        return [self.labelEncoder.inverse_transform(\
-            [prediction[i],])[0] for i in range(0, initLen)]
+        return self.labelEncoder.inverse_transform(list(prediction))[:initLen]
 
     def test_model(self) :
         devX, devY = self.import_arr(self.root + "test")
@@ -179,7 +178,7 @@ class PoStagger:
         residual = concatenate([elmo, bn1])
         gru2 = Bidirectional(GRU(100, dropout=0.2, recurrent_dropout=0.5, return_sequences=True, name='gru2'))(residual)
         bn2 = BatchNormalization()(gru2)
-        output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(gru2)
+        output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(bn2)
         model = Model(inputs=inputs, outputs=output)
         model.compile(optimizer=Adam(), loss='categorical_crossentropy')
         model.summary()
@@ -188,24 +187,6 @@ class PoStagger:
         self.name = "base_model"
         return
 
-    def compile_residual_model(self) :
-        gc.collect()
-        self.labelEncoder = LabelEncoder()
-        self.labelEncoder.classes_ = np.load(self.root + "labelEncoder.npz")['arr_0']
-
-        char_input = Input(shape=(self.seqLen,), name='char_input', dtype=tf.string)
-        elmo_input = Input(shape=(self.seqLen,), name='elmo_input', dtype=tf.string)
-        elmo = layers.ElmoLayer(self.seqLen, self.batchSize)(elmo_input)
-        gru1 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru1'))(elmo)
-        gru2 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru2'))(gru1)
-        output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(gru2)
-        model = Model(inputs=[char_input, elmo_input,], outputs=output)
-        model.compile(optimizer=Adam(), loss='categorical_crossentropy')
-        model.summary()
-
-        self.model = model
-        self.name = "residual"
-        return
 
     def compile_model(self):
         self.compile_base_model()
