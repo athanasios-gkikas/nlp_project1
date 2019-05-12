@@ -6,6 +6,23 @@ def main() :
     model.compile_model()
     model.train_model()
 
+    model.load_model()
+
+    '''
+    this PRON
+    is AUX
+    a DET
+    terrorist ADJ
+    organization NOUN
+    plain ADJ
+    and CCONJ
+    simple ADJ
+    . PUNCT
+    '''
+
+    #This is a terrorist organization plain and simple.
+    #print(model.predict(['This', 'is', 'a', 'terrorist', 'organization', 'plain', 'and', 'simple', '.' ]))
+    model.test_model()
     return
 
 if __name__ == "__main__" :

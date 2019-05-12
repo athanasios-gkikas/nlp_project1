@@ -33,10 +33,10 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
     seq = 25
     inputs = Input(shape=(seq,), name='input', dtype=tf.string)
     elmo = layers.ElmoLayer(seq, batchSize)(inputs)
-    gru1 = Bidirectional(GRU(seq, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='gru1'))(elmo)
+    gru1 = Bidirectional(GRU({{choice([25, 50, 100])}}, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='gru1'))(elmo)
 
     if {{choice(['two', 'three'])}} == "three":
-        gru2 = Bidirectional(GRU(seq, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='lstm2'))(gru1)
+        gru2 = Bidirectional(GRU({{choice([25, 50, 100])}}, dropout={{choice([0.0, 0.2, 0.5])}}, recurrent_dropout={{choice([0.0, 0.2, 0.5])}}, return_sequences=True, name='lstm2'))(gru1)
         output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(gru2)
     else:
         output = TimeDistributed(Dense(len(encoder.classes_), activation='softmax'))(gru1)
@@ -52,7 +52,7 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
     dev_gen = data_generator.data_stream([pTestX, pTestY], batchSize, len(encoder.classes_))
 
     stopper = EarlyStopping(monitor='val_loss',
-                            min_delta=0, patience=3,
+                            min_delta=0, patience=2,
                             verbose=0, mode='auto',
                             restore_best_weights=True)
 
@@ -62,7 +62,7 @@ def create_model(pTrainX, pTrainY, pTestX, pTestY, encoder):
         validation_data=dev_gen,
         validation_steps=math.ceil(len(pTestX) / batchSize),
         callbacks=[stopper, ],
-        epochs=10,
+        epochs=8,
         verbose=1,
         max_queue_size=100,
         workers=1,
@@ -80,7 +80,7 @@ def main():
     best_run, best_model = optim.minimize(model=create_model,
                                           data=data,
                                           algo=tpe.suggest,
-                                          max_evals=50,
+                                          max_evals=10,
                                           trials=Trials())
 
     print("Best performing model chosen hyper-parameters:")

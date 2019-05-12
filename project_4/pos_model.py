@@ -14,13 +14,12 @@ from random import shuffle
 from sklearn.preprocessing import LabelEncoder
 from keras.models import Model
 from keras.layers import Input, Embedding, Dropout, Bidirectional, LSTM, GRU
-from keras.layers import Dense, TimeDistributed
+from keras.layers import Dense, TimeDistributed, BatchNormalization, concatenate
 from keras.optimizers import Adam
 from keras.callbacks import CSVLogger, EarlyStopping
 from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 from nltk import ngrams
-
 
 class PoStagger:
 
@@ -30,6 +29,7 @@ class PoStagger:
         self.batchSize = 128
         self.labelEncoder = None
         self.root = os.getcwd() + "\\dataset\\"
+        self.name = "base"
         return
 
     def numClasses(self):
@@ -143,24 +143,72 @@ class PoStagger:
         return
 
     def load_model(self):
-        self.model.load_weights(self.root + "model_weights")
+        self.model.load_weights(self.root + "base_model")
         return
 
-    def compile_model(self):
+    def predict(self, pSentence) :
+        sentence = pSentence
+        initLen = len(pSentence)
+        for i in range(len(pSentence), self.seqLen):
+            sentence.append('__PAD__')
+
+        sample = np.zeros((self.batchSize, self.seqLen), dtype='S')
+        sample[0,:] = sentence
+
+        prediction = np.argmax(
+            self.model.predict(sample, steps=1)[0, :], axis=1).ravel()
+
+        return [self.labelEncoder.inverse_transform(\
+            [prediction[i],])[0] for i in range(0, initLen)]
+
+    def test_model(self) :
+        devX, devY = self.import_arr(self.root + "test")
+        metric = metrics.Metrics((devX, devY), self.batchSize, self.labelEncoder)
+        metric.getMetrics(self.model)
+        return
+
+    def compile_base_model(self) :
         gc.collect()
         self.labelEncoder = LabelEncoder()
         self.labelEncoder.classes_ = np.load(self.root + "labelEncoder.npz")['arr_0']
 
         inputs = Input(shape=(self.seqLen,), name='input', dtype=tf.string)
         elmo = layers.ElmoLayer(self.seqLen, self.batchSize)(inputs)
-        gru1 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru1'))(elmo)
-        gru2 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru2'))(gru1)
+        gru1 = Bidirectional(GRU(100, dropout=0.2, recurrent_dropout=0.5, return_sequences=True, name='gru1'))(elmo)
+        bn1 = BatchNormalization()(gru1)
+        residual = concatenate([elmo, bn1])
+        gru2 = Bidirectional(GRU(100, dropout=0.2, recurrent_dropout=0.5, return_sequences=True, name='gru2'))(residual)
+        bn2 = BatchNormalization()(gru2)
         output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(gru2)
         model = Model(inputs=inputs, outputs=output)
         model.compile(optimizer=Adam(), loss='categorical_crossentropy')
         model.summary()
 
         self.model = model
+        self.name = "base_model"
+        return
+
+    def compile_residual_model(self) :
+        gc.collect()
+        self.labelEncoder = LabelEncoder()
+        self.labelEncoder.classes_ = np.load(self.root + "labelEncoder.npz")['arr_0']
+
+        char_input = Input(shape=(self.seqLen,), name='char_input', dtype=tf.string)
+        elmo_input = Input(shape=(self.seqLen,), name='elmo_input', dtype=tf.string)
+        elmo = layers.ElmoLayer(self.seqLen, self.batchSize)(elmo_input)
+        gru1 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru1'))(elmo)
+        gru2 = Bidirectional(GRU(self.seqLen, dropout=0.0, recurrent_dropout=0.2, return_sequences=True, name='gru2'))(gru1)
+        output = TimeDistributed(Dense(self.numClasses(), activation='softmax'))(gru2)
+        model = Model(inputs=[char_input, elmo_input,], outputs=output)
+        model.compile(optimizer=Adam(), loss='categorical_crossentropy')
+        model.summary()
+
+        self.model = model
+        self.name = "residual"
+        return
+
+    def compile_model(self):
+        self.compile_base_model()
         return
 
     def train_model(self):
@@ -190,11 +238,11 @@ class PoStagger:
             callbacks=[ \
                 metrics.Metrics((devX, devY), self.batchSize, self.labelEncoder), \
                 stopper, csv_logger],
-            epochs=2,
+            epochs=20,
             verbose=1,
             max_queue_size=100,
             workers=1,
             use_multiprocessing=False, )
 
-        self.model.save_weights(self.root + "model_weights")
+        self.model.save_weights(self.root + self.name)
         return

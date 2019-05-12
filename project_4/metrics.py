@@ -74,7 +74,7 @@ class Metrics(Callback) :
         pass
 
     def on_train_end(self, logs=None) :
-        with gzip.GzipFile(os.getcwd() + "dataset\\report.json.gz", "wb") as file:
+        with gzip.GzipFile(os.getcwd() + "\\dataset\\report.json.gz", "wb") as file:
             file.write(json.dumps(self.mReport, indent=4).encode('utf-8'))
         return
 
